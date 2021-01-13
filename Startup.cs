@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Security.Claims;
@@ -7,6 +8,7 @@ using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -36,23 +38,64 @@ namespace AuthServer
         {
             services.AddControllers();
 
-            services.AddAuthentication()
-                .AddCookie();
+            services.AddAuthentication(options =>
+                {
+                    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+                })
+                .AddJwtBearer(options =>
+                {
+                    options.Authority = "this server's url, e.g. http://localhost:5051/ or https://auth.example.com/";
+                    options.Audience = "example: auth_server_api"; //This must be included in ticket creation
+                    options.RequireHttpsMetadata = false;
+                    options.IncludeErrorDetails = true; //
+                    options.TokenValidationParameters = new TokenValidationParameters()
+                    {
+                        NameClaimType = OpenIddictConstants.Claims.Subject,
+                        RoleClaimType = OpenIddictConstants.Claims.Role,
+                    };
+                });
 
             services.AddOpenIddict()
                 .AddServer(options =>
                 {
                     options.AddDevelopmentEncryptionCertificate()
                         .AddDevelopmentSigningCertificate();
+                    
+                    // Encryption and signing of tokens
+                    // options
+                    //     .AddEphemeralEncryptionKey()
+                    //     .AddEphemeralSigningKey();
 
-                    options.AllowAuthorizationCodeFlow();
-
-                    options.SetAuthorizationEndpointUris("/connect/authorize")
-                        .SetTokenEndpointUris("/connect/token");
-
+                    options
+                        .AllowAuthorizationCodeFlow()
+                        .RequireProofKeyForCodeExchange()
+                        .AllowClientCredentialsFlow()
+                        .AllowPasswordFlow()
+                        .AllowImplicitFlow()
+                        .AllowRefreshTokenFlow();
+                    
+                    // Mark the "email", "profile" and "roles" scopes as supported scopes.
+                    options.RegisterScopes(OpenIddictConstants.Scopes.Email,
+                        OpenIddictConstants.Scopes.Profile,
+                        OpenIddictConstants.Scopes.Roles);
+                    
+                    options
+                        .SetAuthorizationEndpointUris("/connect/authorize")
+                        .SetTokenEndpointUris("/connect/token")
+                        .SetUserinfoEndpointUris("/connect/userinfo");
+                    
+                    // Disables encryption of token
+                    options.DisableAccessTokenEncryption();
+                    
+                    // Register scopes (permissions)
+                    options.RegisterScopes("api");
+                    
                     options.EnableDegradedMode();
 
-                    options.UseAspNetCore();
+                    options.UseAspNetCore()
+                        .EnableTokenEndpointPassthrough()
+                        .EnableAuthorizationEndpointPassthrough()
+                        .EnableUserinfoEndpointPassthrough();
 
                     options.AddEventHandler<OpenIddictServerEvents.ValidateAuthorizationRequestContext>(builder =>
                     {
@@ -112,7 +155,7 @@ namespace AuthServer
                             
                             var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType);
                             identity.AddClaim(new Claim(OpenIddictConstants.Claims.Subject,
-                                principal.GetClaim(ClaimTypes.NameIdentifier)));
+                                principal.GetClaim(ClaimTypes.Name)));
 
                             foreach (var claim in identity.Claims)
                             {

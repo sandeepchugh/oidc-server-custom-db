@@ -8,6 +8,8 @@ using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -36,23 +38,12 @@ namespace AuthServer
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddControllers();
+            services.AddControllersWithViews();
 
-            services.AddAuthentication(options =>
+            services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
                 {
-                    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-                })
-                .AddJwtBearer(options =>
-                {
-                    options.Authority = "this server's url, e.g. http://localhost:5051/ or https://auth.example.com/";
-                    options.Audience = "example: auth_server_api"; //This must be included in ticket creation
-                    options.RequireHttpsMetadata = false;
-                    options.IncludeErrorDetails = true; //
-                    options.TokenValidationParameters = new TokenValidationParameters()
-                    {
-                        NameClaimType = OpenIddictConstants.Claims.Subject,
-                        RoleClaimType = OpenIddictConstants.Claims.Role,
-                    };
+                    options.LoginPath = "/account/login";
                 });
 
             services.AddOpenIddict()
@@ -108,7 +99,7 @@ namespace AuthServer
                                 return default;
                             }
                             
-                            if (!string.Equals(context.RedirectUri, "http://localhost:3000", StringComparison.Ordinal))
+                            if (!string.Equals(context.RedirectUri, "https://oauth.pstmn.io/v1/callback", StringComparison.Ordinal))
                             {
                                 context.Reject(error: OpenIddictConstants.Errors.InvalidClient,
                                     description:"The specified 'redirect_uri' is not valid for this client application");
@@ -142,17 +133,15 @@ namespace AuthServer
                             var request = context.Transaction.GetHttpRequest() ??
                                           throw new InvalidOperationException(
                                               "The ASP.NET Core request cannot be retrieved");
-                            
-                            // TODO: validate against database
-                            var principal = new ClaimsPrincipal(new ClaimsIdentity(new GenericIdentity("TestUser")));
-                            await Task.CompletedTask;
-                            
+
+                            var principal = (await request.HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme))?.Principal;
                             if (principal == null)
                             {
+                                await request.HttpContext.ChallengeAsync(CookieAuthenticationDefaults.AuthenticationScheme);
                                 context.HandleRequest();
                                 return;
                             }
-                            
+
                             var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType);
                             identity.AddClaim(new Claim(OpenIddictConstants.Claims.Subject,
                                 principal.GetClaim(ClaimTypes.Name)));
@@ -189,7 +178,7 @@ namespace AuthServer
             
             app.UseAuthorization();
 
-            app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
+            app.UseEndpoints(endpoints => { endpoints.MapDefaultControllerRoute(); });
         }
     }
 }

@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System;
 using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using AuthServer.Repositories;
 using AuthServer.ViewModels;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -13,6 +15,13 @@ namespace AuthServer.Controllers
 {
     public class AccountController : Controller
     {
+        private readonly IUserRepository _repository;
+
+        public AccountController(IUserRepository repository)
+        {
+            _repository = repository;
+        }
+
         [HttpGet]
         [AllowAnonymous]
         public IActionResult Login(string returnUrl = null)
@@ -37,10 +46,19 @@ namespace AuthServer.Controllers
 
                 var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
-                // TODO: check for valid user name and password 
+                var userId = await _repository.GetUser(model.Username, model.Password);
+                if (userId == 0)
+                {
+                    if (Url.IsLocalUrl(model.ReturnUrl) || model.ReturnUrl == null)
+                    {
+                        return View(model);
+                    }
+                    return StatusCode(401);
+                }
 
 
                 await HttpContext.SignInAsync(new ClaimsPrincipal(claimsIdentity));
+
 
                 if (Url.IsLocalUrl(model.ReturnUrl))
                 {

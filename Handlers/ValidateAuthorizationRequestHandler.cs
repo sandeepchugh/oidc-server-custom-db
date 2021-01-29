@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using AuthServer.Configuration;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -14,9 +15,15 @@ namespace AuthServer.Handlers
 {
     public class ValidateAuthorizationRequestHandler : IOpenIddictServerHandler<OpenIddictServerEvents.ValidateAuthorizationRequestContext>
     {
+        private readonly OpenIdConfiguration _configuration;
+        public ValidateAuthorizationRequestHandler(OpenIdConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
+
         public ValueTask HandleAsync(OpenIddictServerEvents.ValidateAuthorizationRequestContext context)
         {
-            var clients = new List<string> { "console_app" };
+            var clients = _configuration.Clients;
             if (!clients.Contains(context.ClientId?.ToLower()))
             {
                 context.Reject(error: OpenIddictConstants.Errors.InvalidClient,
@@ -24,8 +31,7 @@ namespace AuthServer.Handlers
                 return default;
             }
 
-            var redirectUris = new List<string>
-                    {"https://localhost:3000", "https://oauth.pstmn.io/v1/callback"};
+            var redirectUris = _configuration.RedirectUris;
             if (!redirectUris.Contains(context.RedirectUri?.ToLower()))
             {
                 context.Reject(error: OpenIddictConstants.Errors.InvalidClient,

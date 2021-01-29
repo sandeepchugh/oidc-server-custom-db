@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using AuthServer.Configuration;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -14,6 +15,12 @@ namespace AuthServer.Handlers
 {
     public class HandleAuthorizationRequestHandler : IOpenIddictServerHandler<OpenIddictServerEvents.HandleAuthorizationRequestContext>
     {
+        private readonly OpenIdConfiguration _configuration;
+
+        public HandleAuthorizationRequestHandler(OpenIdConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
         public async ValueTask HandleAsync(OpenIddictServerEvents.HandleAuthorizationRequestContext context)
         {
             var request = context.Transaction.GetHttpRequest() ??

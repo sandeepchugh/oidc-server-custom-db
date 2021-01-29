@@ -7,6 +7,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Threading.Tasks;
+using AuthServer.Configuration;
 using AuthServer.Handlers;
 using AuthServer.Repositories;
 using Microsoft.AspNetCore;
@@ -43,6 +44,10 @@ namespace AuthServer
             services.AddControllersWithViews();
             string connectionString = Configuration.GetConnectionString("DefaultConnection");
             services.AddScoped<IUserRepository>(x => new UserRepository(connectionString));
+
+            services.AddSingleton(Configuration.GetSection("OpenId").Get<OpenIdConfiguration>());
+
+            //services.AddSingleton<IConfiguration>(Configuration);
             services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
                 .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme,
                     options => { options.LoginPath = "/account/login"; });

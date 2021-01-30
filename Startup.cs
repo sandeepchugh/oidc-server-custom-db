@@ -16,6 +16,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -52,12 +53,18 @@ namespace AuthServer
                 .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme,
                     options => { options.LoginPath = "/account/login"; });
 
+            services.Configure<ForwardedHeadersOptions>(options =>
+            {
+                options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
+            });
+            
             services.AddOpenIddict()
                 .AddServer(options =>
                 {
                     options.AddDevelopmentEncryptionCertificate()
                         .AddDevelopmentSigningCertificate();
 
+                    
                     // Encryption and signing of tokens
                     // options
                     //     .AddEphemeralEncryptionKey()
